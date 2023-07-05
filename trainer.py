@@ -5,7 +5,7 @@ import torch
 
 
 class IndexingTrainer(Trainer):
-    def __init__(self, restrict_decode_vocab, **kwds):
+    def __init__(self, restrict_decode_vocab=None, **kwds):
         super().__init__(**kwds)
         self.restrict_decode_vocab = restrict_decode_vocab
 
@@ -26,9 +26,15 @@ class IndexingTrainer(Trainer):
         # eval_loss = super().prediction_step(model, inputs, True, ignore_keys)[0]
         with torch.no_grad():
             # greedy search
-            doc_ids = model.generate(
-                inputs['input_ids'].to(self.args.device),
-                max_length=20,
-                prefix_allowed_tokens_fn=self.restrict_decode_vocab,
-                early_stopping=True,)
+            if self.restrict_decode_vocab:
+                doc_ids = model.generate(
+                    inputs['input_ids'].to(self.args.device),
+                    max_length=20,
+                    prefix_allowed_tokens_fn=self.restrict_decode_vocab,
+                    early_stopping=True,)
+            else:
+                doc_ids = model.generate(
+                    inputs['input_ids'].to(self.args.device),
+                    max_length=20,
+                    early_stopping=True,)
         return (None, doc_ids, inputs['labels'])

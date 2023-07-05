@@ -2,6 +2,8 @@ import re
 import numpy as np
 import json
 
+RE_COMMAND = re.compile(r"\<\|(?P<command>[^(]+)\((?P<params>[^)<{}]*)\)\|\>")
+
 with open('chatweb3_data-2.jsonl', "r") as f:
     data = f.readlines()
 
@@ -11,7 +13,7 @@ NUM_EVAL = int(len(data)*0.1)
 with open('widgets.txt', "r") as f:
     lines = f.read()
 
-count = 1 
+count = 0 
 widg2doc, widg2id = {}, {}
 for l in lines.split('---'):
     widg2doc[re.search(r'\|(.*?)\(', l).group(1)] = l.split('Description of widget: ')[-1].split('\nRequired parameters:')[0]
@@ -28,15 +30,15 @@ with open('chatweb3_multi_task_train.json', 'w') as tf, \
         try:
             query_text = dict_['prompt']
             doc_text = widg2doc[re.search(r'\|(.*?)\(', dict_['completion']).group(1)]
-            current_docid = widg2id[re.search(r'\|(.*?)\(', dict_['completion']).group(1)]
+            function = '_'.join(RE_COMMAND.search(dict_['completion']).group('command').split('-'))
+            jitem = json.dumps({'text_id': function, 'text': 'document: ' + doc_text})
+            tf.write(jitem + '\n')
+            jitem = json.dumps({'text_id': function, 'text': 'query: ' + query_text})
+            if ind <= NUM_TRAIN:
+                tf.write(jitem + '\n')
+            else:
+                vf.write(jitem + '\n')
         except: 
             print('error with datapoint')
             pass
-        jitem = json.dumps({'text_id': str(current_docid), 'text': 'document: ' + doc_text})
-        tf.write(jitem + '\n')
-        jitem = json.dumps({'text_id': str(current_docid), 'text': 'query: ' + query_text})
-        if ind <= NUM_TRAIN:
-            tf.write(jitem + '\n')
-        else:
-            vf.write(jitem + '\n')
 print("created train & val set")

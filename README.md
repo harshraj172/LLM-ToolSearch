@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
     - **Finetuning with docID (input=query, output=docID)**  
     
-    - `python train.py --finetune_type 2 --dataset_name API --model_name t5-base`
+    `python train.py --finetune_type 2 --dataset_name API --model_name t5-base`
     
     - **DSI (input=query, output=docID)** 
     

@@ -1,4 +1,3 @@
-import argparse
 from data import IndexingTrainDataset, IndexingCollator, QueryEvalCollator
 from transformers import T5Tokenizer, T5ForConditionalGeneration, TrainingArguments, TrainerCallback
 from trainer import IndexingTrainer
@@ -35,21 +34,13 @@ class QueryEvalCallback(TrainerCallback):
         for batch in tqdm(self.dataloader, desc='Evaluating dev queries'):
             inputs, labels = batch
             with torch.no_grad():
-                if self.restrict_decode_vocab:
-                    batch_beams = model.generate(
-                        inputs['input_ids'].to(model.device),
-                        max_length=20,
-                        num_beams=10,
-                        prefix_allowed_tokens_fn=self.restrict_decode_vocab,
-                        num_return_sequences=10,
-                        early_stopping=True, ).reshape(inputs['input_ids'].shape[0], 10, -1)
-                else:
-                    batch_beams = model.generate(
-                        inputs['input_ids'].to(model.device),
-                        max_length=20,
-                        num_beams=10,
-                        num_return_sequences=10,
-                        early_stopping=True, ).reshape(inputs['input_ids'].shape[0], 10, -1)
+                batch_beams = model.generate(
+                    inputs['input_ids'].to(model.device),
+                    max_length=20,
+                    num_beams=10,
+                    prefix_allowed_tokens_fn=self.restrict_decode_vocab,
+                    num_return_sequences=10,
+                    early_stopping=True, ).reshape(inputs['input_ids'].shape[0], 10, -1)
                 for beams, label in zip(batch_beams, labels):
                     rank_list = self.tokenizer.batch_decode(beams,
                                                             skip_special_tokens=True)  # beam search should not return repeated docids but somehow due to T5 tokenizer there some repeats.
@@ -76,31 +67,32 @@ def compute_metrics(eval_preds):
 
 
 def main():
+    model_name = "t5-base"
     L = 50  # only use the first 32 tokens of documents (including title)
 
     # We use wandb to log Hits scores after each epoch. Note, this script does not save model checkpoints.
     wandb.login()
-    wandb.init(project="llm_tool_search", name=f'{args.dataset_name}-{args.model_name}')
+    wandb.init(project="llm_tool_search", name='API-docid-t5-base')
 
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name, cache_dir='cache')
-    model = T5ForConditionalGeneration.from_pretrained(args.model_name, cache_dir='cache')
+    tokenizer = T5Tokenizer.from_pretrained(model_name, cache_dir='cache')
+    model = T5ForConditionalGeneration.from_pretrained(model_name, cache_dir='cache')
 
-    train_dataset = IndexingTrainDataset(path_to_data=f"data{'-finetune' if args.finetune_type in [1, 2] else ''}/{args.dataset_name}/{args.train_file_name}",
+    train_dataset = IndexingTrainDataset(path_to_data='data/API/API_multi_task_train-docid.json',
                                          max_length=L,
                                          cache_dir='cache',
-                                         tokenizer=tokenizer,)
+                                         tokenizer=tokenizer)
     
     # This eval set is really not the 'eval' set but used to report if the model can memorise (index) all training data points.
-    eval_dataset = IndexingTrainDataset(path_to_data=f"data{'-finetune' if args.finetune_type in [1, 2] else ''}/{args.dataset_name}/{args.val_file_name}",
+    eval_dataset = IndexingTrainDataset(path_to_data='data/API/API_multi_task_train-docid.json',
                                         max_length=L,
                                         cache_dir='cache',
-                                        tokenizer=tokenizer,)
+                                        tokenizer=tokenizer)
     
     # This is the actual eval set.
-    test_dataset = IndexingTrainDataset(path_to_data=f"data{'-finetune' if args.finetune_type in [1, 2] else ''}/{args.dataset_name}/{args.val_file_name}",
+    test_dataset = IndexingTrainDataset(path_to_data='data/API/API_valid-docid.json',
                                         max_length=L,
                                         cache_dir='cache',
-                                        tokenizer=tokenizer,)
+                                        tokenizer=tokenizer)
 
     ################################################################
     # docid generation constrain, we only generate integer docids.
@@ -118,15 +110,15 @@ def main():
 
     def restrict_decode_vocab(batch_idx, prefix_beam):
         return INT_TOKEN_IDS
-    ################################################################    
-    
+    ################################################################
+
     training_args = TrainingArguments(
         output_dir="./results",
         learning_rate=0.0005,
         warmup_steps=10000,
         # weight_decay=0.01,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=32,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         evaluation_strategy='steps',
         eval_steps=1000,
         max_steps=20000,
@@ -136,15 +128,9 @@ def main():
         save_strategy='no',
         # fp16=True,  # gives 0/nan loss at some point during training, seems this is a transformers bug.
         dataloader_num_workers=10,
-        gradient_accumulation_steps=args.gradient_accumulation_steps
+        gradient_accumulation_steps=2
     )
-    
-    if args.finetune_type in [2, 3]:
-        kwargs = \
-        {'callbacks': [QueryEvalCallback(test_dataset, wandb, restrict_decode_vocab, training_args, tokenizer)],
-         'restrict_decode_vocab': restrict_decode_vocab,}
-    else:
-        kwargs = {'callbacks': [QueryEvalCallback(test_dataset, wandb, None, training_args, tokenizer)],}
+
     trainer = IndexingTrainer(
         model=model,
         tokenizer=tokenizer,
@@ -156,50 +142,12 @@ def main():
             padding='longest',
         ),
         compute_metrics=compute_metrics,
-        **kwargs
+        callbacks=[QueryEvalCallback(test_dataset, wandb, restrict_decode_vocab, training_args, tokenizer)],
+        restrict_decode_vocab=restrict_decode_vocab
     )
     trainer.train(
     )
 
 
 if __name__ == "__main__":
-    # Create the parser
-    parser = argparse.ArgumentParser(description='parser to run the script')
-
-    # add arguments
-    parser.add_argument('--finetune_type',
-                        type=int,
-                        default=1,
-                        help='''Method for finetuning:
-                        1 - finetuning (input=query, output=function name)
-                        2 - finetuning with docID (input=query, output=docID)
-                        3 - DSI (input=query, output=docID)
-                        4 - DSI w/o docID (input=query, output=function name)
-                        ''')
-    parser.add_argument('--dataset_name',
-                        type=str,
-                        default="API",
-                        help='name of the dataset')
-    parser.add_argument('--model_name',
-                        type=str,
-                        default="t5-base",
-                        help='model to be finetuned')
-    args = parser.parse_args()
-    if args.finetune_type == 1:
-        args.train_file_name = f'{args.dataset_name}_train.json'
-        args.val_file_name = f'{args.dataset_name}_valid.json'
-        args.gradient_accumulation_steps = 1
-    elif args.finetune_type == 2:
-        args.train_file_name = f'{args.dataset_name}_train-docid.json'
-        args.val_file_name = f'{args.dataset_name}_valid-docid.json'
-        args.gradient_accumulation_steps = 1
-    elif args.finetune_type == 3:
-        args.train_file_name = f'{args.dataset_name}_multi_task_train-docid.json'
-        args.val_file_name = f'{args.dataset_name}_valid-docid.json'
-        args.gradient_accumulation_steps = 2
-    elif args.finetune_type == 4:
-        args.train_file_name = f'{args.dataset_name}_multi_task_train.json'
-        args.val_file_name = f'{args.dataset_name}_valid.json'
-        args.gradient_accumulation_steps = 2
-        
     main()

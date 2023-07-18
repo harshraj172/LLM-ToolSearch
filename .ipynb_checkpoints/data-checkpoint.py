@@ -12,6 +12,7 @@ class IndexingTrainDataset(Dataset):
             max_length: int,
             cache_dir: str,
             tokenizer: PreTrainedTokenizer,
+            finetune: bool = False,
     ):
         self.train_data = datasets.load_dataset(
             'json',
@@ -23,6 +24,7 @@ class IndexingTrainDataset(Dataset):
         self.max_length = max_length
         self.tokenizer = tokenizer
         self.total_len = len(self.train_data)
+        self.finetune = finetune
 
 
     def __len__(self):
@@ -35,7 +37,7 @@ class IndexingTrainDataset(Dataset):
                                    return_tensors="pt",
                                    truncation='only_first',
                                    max_length=self.max_length).input_ids[0]
-        return input_ids, str(data['completion'])
+        return input_ids, str(data['text_id']) if not self.finetune else str(data['completion'])
 
 
 @dataclass

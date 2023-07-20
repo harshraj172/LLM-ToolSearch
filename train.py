@@ -80,7 +80,7 @@ def main():
 
     # We use wandb to log Hits scores after each epoch. Note, this script does not save model checkpoints.
     wandb.login()
-    wandb.init(project="llm_tool_search", name=f'{args.dataset_name}-{args.model_name}')
+    wandb.init(project="llm_tool_search", name=f'{args.dataset_name}-{args.model_name}-{args.finetune_type}')
 
     tokenizer = T5Tokenizer.from_pretrained(args.model_name, cache_dir='cache')
     model = T5ForConditionalGeneration.from_pretrained(args.model_name, cache_dir='cache')
@@ -125,8 +125,8 @@ def main():
         learning_rate=0.0005,
         warmup_steps=10000,
         # weight_decay=0.01,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=32,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         evaluation_strategy='steps',
         eval_steps=1000,
         max_steps=20000,

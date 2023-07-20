@@ -7,7 +7,7 @@ conda activate env
 pip install -r requirements.txt
 ```
 ## Experiments
-1. There are 4 varians of comparison:
+1. Comparison of our method with finetuning and other variants.
     
     - **Finetuning (input=query, output=function name)** 
     
@@ -24,3 +24,9 @@ pip install -r requirements.txt
     - **DSI w/o docID (input=query, output=function name)** 
     
     `python train.py --finetune_type 4 --dataset_name API --model_name t5-base`
+
+2. Performance with increasing data size -> ideally `finetuning_type 3` should become more and more better than the other methods
+
+3. Performance with increasing model size
+
+4. Hallcuination

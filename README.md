@@ -11,19 +11,19 @@ pip install -r requirements.txt
     
     - **Finetuning (input=query, output=function name)** 
     
-    `python train.py --finetune_type 1 --dataset_name API --model_name t5-base`
+    `python train.py --finetune_type 1 --dataset_name API --model_name t5-large`
 
     - **Finetuning with docID (input=query, output=docID)**  
     
-    `python train.py --finetune_type 2 --dataset_name API --model_name t5-base`
+    `python train.py --finetune_type 2 --dataset_name API --model_name t5-large`
     
     - **DSI (input=query, output=docID)** 
     
-    `python train.py --finetune_type 3 --dataset_name API --model_name t5-base`
+    `python train.py --finetune_type 3 --dataset_name API --model_name t5-large`
     
     - **DSI w/o docID (input=query, output=function name)** 
     
-    `python train.py --finetune_type 4 --dataset_name API --model_name t5-base`
+    `python train.py --finetune_type 4 --dataset_name API --model_name t5-large`
 
 2. Performance with increasing data size -> ideally `finetuning_type 3` should become more and more better than the other methods
 

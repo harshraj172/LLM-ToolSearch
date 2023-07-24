@@ -80,7 +80,7 @@ def main():
 
     # We use wandb to log Hits scores after each epoch. Note, this script does not save model checkpoints.
     wandb.login()
-    wandb.init(project="llm_tool_search", name=f'{args.dataset_name}-{args.model_name}-{args.finetune_type}')
+    wandb.init(project="llm_tool_search", name=f"{args.dataset_name}-{args.model_name}-{args.finetune_type}-{args.train_file_name.split('-')[-1]}")
 
     tokenizer = T5Tokenizer.from_pretrained(args.model_name, cache_dir='cache')
     model = T5ForConditionalGeneration.from_pretrained(args.model_name, cache_dir='cache')
@@ -125,8 +125,8 @@ def main():
         learning_rate=0.0005,
         warmup_steps=10000,
         # weight_decay=0.01,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        per_device_train_batch_size=32,
+        per_device_eval_batch_size=32,
         evaluation_strategy='steps',
         eval_steps=1000,
         max_steps=20000,
@@ -186,19 +186,19 @@ if __name__ == "__main__":
                         help='model to be finetuned')
     args = parser.parse_args()
     if args.finetune_type == 1:
-        args.train_file_name = f'{args.dataset_name}_train.json'
+        args.train_file_name = f'{args.dataset_name}_train-0.25.json'
         args.val_file_name = f'{args.dataset_name}_valid.json'
         args.gradient_accumulation_steps = 1
     elif args.finetune_type == 2:
-        args.train_file_name = f'{args.dataset_name}_train-docid.json'
+        args.train_file_name = f'{args.dataset_name}_train-docid-0.25.json'
         args.val_file_name = f'{args.dataset_name}_valid-docid.json'
         args.gradient_accumulation_steps = 1
     elif args.finetune_type == 3:
-        args.train_file_name = f'{args.dataset_name}_multi_task_train-docid.json'
+        args.train_file_name = f'{args.dataset_name}_multi_task_train-docid-0.25.json'
         args.val_file_name = f'{args.dataset_name}_valid-docid.json'
         args.gradient_accumulation_steps = 2
     elif args.finetune_type == 4:
-        args.train_file_name = f'{args.dataset_name}_multi_task_train.json'
+        args.train_file_name = f'{args.dataset_name}_multi_task_train-0.25.json'
         args.val_file_name = f'{args.dataset_name}_valid.json'
         args.gradient_accumulation_steps = 2
         

@@ -16,7 +16,10 @@ with open('API_multi_task_train.json', 'w') as f:
     for line in lines:
         dict_ = json.loads(line)
         doc_id = dict_['api_data']['api_name']
+        doc_text = dict_['api_data']['description']
         query_text = dict_['code'].split('\n')[0].split(': ')[-1]
+        jitem = json.dumps({'completion': doc_id, 'text': 'document: ' + doc_text})
+        f.write(jitem + '\n')
         jitem = json.dumps({'completion': doc_id, 'text': 'query: ' + query_text})
         f.write(jitem + '\n')
 

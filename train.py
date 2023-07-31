@@ -28,7 +28,7 @@ class QueryEvalCallback(TrainerCallback):
             num_workers=self.args.dataloader_num_workers,
         )
 
-    def on_epoch_end(self, args, state, control, **kwargs):
+    def on_evaluate(self, args, state, control, **kwargs):
         hit_at_1 = 0
         hit_at_10 = 0
         model = kwargs['model'].eval()
@@ -36,7 +36,7 @@ class QueryEvalCallback(TrainerCallback):
             inputs, labels = batch
             with torch.no_grad():
                 if self.restrict_decode_vocab:
-                    batch_beams = model.generate(
+                    batch_beams = model.module.generate(
                         inputs['input_ids'].to(model.device),
                         max_length=20,
                         num_beams=10,
@@ -44,7 +44,7 @@ class QueryEvalCallback(TrainerCallback):
                         num_return_sequences=10,
                         early_stopping=True, ).reshape(inputs['input_ids'].shape[0], 10, -1)
                 else:
-                    batch_beams = model.generate(
+                    batch_beams = model.module.generate(
                         inputs['input_ids'].to(model.device),
                         max_length=20,
                         num_beams=10,
@@ -80,7 +80,7 @@ def main():
 
     # We use wandb to log Hits scores after each epoch. Note, this script does not save model checkpoints.
     wandb.login()
-    wandb.init(project="llm_tool_search", name=f"{args.dataset_name}-{args.model_name}-{args.finetune_type}")
+    wandb.init(project="llm_tool_search", name=f"{args.dataset_name}-{args.model_name}-{args.finetune_type}-{args.train_file_name.split('-')[-1]}")
 
     tokenizer = T5Tokenizer.from_pretrained(args.model_name, cache_dir='cache')
     model = T5ForConditionalGeneration.from_pretrained(args.model_name, cache_dir='cache')
@@ -128,11 +128,11 @@ def main():
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         evaluation_strategy='steps',
-        eval_steps=1000,
+        eval_steps=5000,
         max_steps=20000,
         dataloader_drop_last=False,  # necessary
         report_to='wandb',
-        logging_steps=50,
+        logging_steps=200,
         save_strategy='no',
         # fp16=True,  # gives 0/nan loss at some point during training, seems this is a transformers bug.
         dataloader_num_workers=10,
@@ -186,19 +186,19 @@ if __name__ == "__main__":
                         help='model to be finetuned')
     args = parser.parse_args()
     if args.finetune_type == 1:
-        args.train_file_name = f'{args.dataset_name}_train.json'
+        args.train_file_name = f'{args.dataset_name}_train-0.75.json'
         args.val_file_name = f'{args.dataset_name}_valid.json'
         args.gradient_accumulation_steps = 1
     elif args.finetune_type == 2:
-        args.train_file_name = f'{args.dataset_name}_train-docid.json'
+        args.train_file_name = f'{args.dataset_name}_train-docid-0.75.json'
         args.val_file_name = f'{args.dataset_name}_valid-docid.json'
         args.gradient_accumulation_steps = 1
     elif args.finetune_type == 3:
-        args.train_file_name = f'{args.dataset_name}_multi_task_train-docid.json'
+        args.train_file_name = f'{args.dataset_name}_multi_task_train-docid-0.75.json'
         args.val_file_name = f'{args.dataset_name}_valid-docid.json'
         args.gradient_accumulation_steps = 2
     elif args.finetune_type == 4:
-        args.train_file_name = f'{args.dataset_name}_multi_task_train.json'
+        args.train_file_name = f'{args.dataset_name}_multi_task_train-0.75.json'
         args.val_file_name = f'{args.dataset_name}_valid.json'
         args.gradient_accumulation_steps = 2
         
